@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#1e40af">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>Validador Serie B - BCB</title>
+    <link rel="stylesheet" href="styles.css">
+    <!-- OpenCV.js -->
+    <script async src="https://docs.opencv.org/4.8.0/opencv.js" onload="onOpenCvReady();"></script>
+    <!-- Tesseract.js -->
+    <script src='https://unpkg.com/tesseract.js@4.1.1/dist/tesseract.min.js'></script>
+</head>
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <h1>Verificación Serie B BCB</h1>
+               </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Tab Buttons -->
+            <div class="tab-buttons">
+                <button class="tab-btn active" onclick="switchTab('camera')">
+                    <span class="icon">📷</span>
+                    <span>Escanear</span>
+                </button>
+                <button class="tab-btn" onclick="switchTab('manual')">
+                    <span class="icon">⌨️</span>
+                    <span>Manual</span>
+                </button>
+            </div>
+
+            <!-- Camera View -->
+            <div id="view-camera" class="view active">
+                <div class="camera-container">
+                    <div class="video-wrapper">
+                        <video id="video" autoplay playsinline muted></video>
+                        <canvas id="canvasOverlay"></canvas>
+                        
+                        <!-- Guía de enfoque -->
+                        <div class="focus-guide">
+                            <div class="focus-frame">
+                                <span class="corner tl"></span>
+                                <span class="corner tr"></span>
+                                <span class="corner bl"></span>
+                                <span class="corner br"></span>
+                            </div>
+                            <p class="guide-text">Enfoca el número de serie aquí</p>
+                        </div>
+
+                        <!-- Indicador de procesamiento -->
+                        <div id="processing" class="processing-overlay hidden">
+                            <div class="spinner"></div>
+                            <span>Analizando...</span>
+                        </div>
+                    </div>
+
+                    <!-- Controles -->
+                    <div class="camera-controls">
+                        <button id="btnStart" class="btn btn-primary btn-full">
+                            Iniciar Cámara
+                        </button>
+                        <button id="btnStop" class="btn btn-danger btn-full hidden">
+                            Detener
+                        </button>
+                        <button id="btnCapture" class="btn btn-capture hidden">
+                            <div class="capture-ring"></div>
+                        </button>
+                        
+                        <div id="cameraOptions" class="camera-options hidden">
+                            <select id="cameraSelect" class="select-camera"></select>
+                            <button id="btnSwitch" class="btn btn-icon">🔄</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Resultado inmediato -->
+                <div id="scanResult" class="scan-result hidden">
+                    <div class="result-card" id="resultCard">
+                        <div class="result-icon" id="resultIcon">✓</div>
+                        <div class="result-info">
+                            <h3 id="resultTitle">Verificando...</h3>
+                            <p id="resultSerie" class="serie-number">000000000 B</p>
+                            <p id="resultDetail" class="detail">Espere un momento</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Historial -->
+                <div class="history-section">
+                    <h3>Últimos escaneos</h3>
+                    <div id="historyList" class="history-list">
+                        <div class="empty-state">Los resultados aparecerán aquí</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Manual View -->
+            <div id="view-manual" class="view">
+                <div class="manual-form">
+                    <div class="form-header">
+                        <h2>Validación Manual</h2>
+                        <p>Ingresa los datos del billete Serie B</p>
+                    </div>
+
+                    <!-- Selector de denominación -->
+                    <div class="denomination-selector">
+                        <label class="input-label">Denominación:</label>
+                        <div class="denom-buttons">
+                            <button type="button" class="denom-btn" data-value="10" onclick="selectDenom(10)">
+                                <div class="denom-indicator" style="background: #2d5a27;"></div>
+                                <span class="denom-amount">Bs. 10</span>
+                            </button>
+                            <button type="button" class="denom-btn" data-value="20" onclick="selectDenom(20)">
+                                <div class="denom-indicator" style="background: #c65d3b;"></div>
+                                <span class="denom-amount">Bs. 20</span>
+                            </button>
+                            <button type="button" class="denom-btn" data-value="50" onclick="selectDenom(50)">
+                                <div class="denom-indicator" style="background: #7c3aed;"></div>
+                                <span class="denom-amount">Bs. 50</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Input de serie (solo números) -->
+                    <div class="input-group">
+                        <label class="input-label">Número de serie:</label>
+                        <div class="serie-input-container">
+                            <input 
+                                type="tel" 
+                                id="serieInput" 
+                                class="serie-input" 
+                                maxlength="9" 
+                                placeholder="000000000"
+                                pattern="[0-9]*"
+                                inputmode="numeric"
+                                oninput="validateInput(this)"
+                            >
+                            <span class="serie-letter">B</span>
+                        </div>
+                        <span class="input-hint">Ingresa los 9 dígitos. La letra B es automática.</span>
+                    </div>
+
+                    <!-- Botón verificar -->
+                    <button id="btnVerify" class="btn btn-verify" onclick="verifyManual()">
+                        VERIFICAR
+                    </button>
+
+                    <!-- Resultado -->
+                    <div id="manualResult" class="validation-result hidden">
+                        <div class="status-card" id="statusCard">
+                            <span class="status-icon" id="statusIcon">○</span>
+                            <div class="status-text">
+                                <h3 id="statusTitle">--</h3>
+                                <p id="statusDesc">--</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Info de rangos -->
+                    <div class="info-box">
+                        <details>
+                            <summary>Ver rangos inválidos publicados</summary>
+                            <div class="ranges-list" id="rangesList">
+                                <!-- Se carga dinámicamente -->
+                            </div>
+                        </details>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Donation footer -->
+            <footer class="app-footer">
+                <button class="donation-btn" onclick="showDonation()">
+                    ❤️ Apoyar esta app
+                </button>
+            </footer>
+        </main>
+
+<!-- Modal Donación -->
+<div id="donationModal" class="modal hidden">
+    <div class="modal-content">
+        
+        <span class="close-btn" onclick="hideDonation()">&times;</span>
+
+        <h3>Apoyo Voluntario</h3>
+        <p>Si te es útil esta aplicación, puedes apoyar su desarrollo:</p>
+
+        <div class="qr-box">
+            <img src="qr-donacion.jpg" alt="QR de donación">
+        </div>
+
+        <button class="btn btn-secondary" onclick="hideDonation()">Cerrar</button>
+
+    </div>
+</div>
+
+    <!-- Scripts -->
+    <script src="data/rangos_series.js"></script>
+    <script src="validator.js"></script>
+    <script src="ocr.js"></script>
+    <script src="detector.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
